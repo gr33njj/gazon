@@ -1,0 +1,63 @@
+# Assets/Scripts — вертикальный срез (Phase 1)
+
+Портирует только ядро цикла из `Docs/GDD.md`: докстанция → стеллажи → окно выдачи → таймер смены.
+**Осознанно не реализовано** (см. `Docs/Architecture.md`, Phase 1 — сначала паритет по ощущению цикла,
+остальное — отдельными шагами после того, как этот срез играбелен):
+- QTE при выдаче, мини-игры «Крокодил» и «Глаз Бога»
+- телефон (рилсы/донат-магазин), апгрейды
+- кража, штрафы, курьер-конфронтация, перекур
+- ночная инвентаризация, увольнение/ребрендинг VILBERIS
+
+Эти файлы написаны без Unity Editor (на VPS его нет — см. `Docs/Architecture.md`, раздел
+«Ограничения текущей машины») и **не скомпилированы и не проверены в реальном Unity**.
+Первое, что нужно сделать после того как откроете проект: дать Unity пересобрать `.meta`,
+проверить компиляцию, и уже в Editor собрать сцену (стеллажи как `ShelfCell`, докстанцию с
+`DockSpawner`, окно с `WindowStation`, игрока с `PlayerController`+`PlayerInteraction`).
+
+## Структура
+
+- `Core/GameManager.cs` — день, время смены, деньги, рейтинг, состояние игры (Menu/Play/Summary).
+  Все три параметра публикуются через `UnityEvent`, чтобы UI можно было привязать в инспекторе
+  без дополнительного кода.
+- `World/Box.cs`, `World/ShelfCell.cs` — коробка и ячейка стеллажа. Состояния коробки:
+  `Dock → Carried → OnShelf → Carried → HandedOver`.
+- `World/DockSpawner.cs` — раз в `truckIntervalSeconds` (уменьшается с днём, как в MVP:
+  `max(30, 48 - day*2)`) спавнит `min(4 + day*2, 12)` коробок на докстанции.
+- `World/WindowStation.cs` — принимает коробку от игрока, сверяет с заказом клиента, платит 45 ₽.
+- `Customers/Customer.cs`, `Customers/CustomerSpawner.cs` — клиент привязан к конкретной свободной
+  коробке на полке в момент спавна (как в MVP: `spawnCustomer` выбирает `avail` среди коробок на полке
+  без заказчика), идёт к окну, ждёт с убывающим терпением.
+- `Player/PlayerController.cs` — WASD + мышь, `Shift` бег (как в MVP: `run = shift ? 1.5 : 1`).
+- `Player/PlayerInteraction.cs` — raycast на `IInteractable` перед камерой, `E` — интеракция,
+  перенос текущей коробки в руках.
+- `Interaction/IInteractable.cs` — общий интерфейс для Box/ShelfCell/WindowStation.
+
+## Числа, которые уже перенесены 1:1 из MVP (см. `Docs/GDD.md`)
+
+- Выдача заказа: **+45 ₽**. Постановка коробки в ячейку: **+10 ₽**.
+- Партия коробок: `min(4 + day*2, 12)`. Интервал газели: `max(30, 48 - day*2)` сек.
+- Длительность смены: `max(120, 180 - (day-1)*5)` сек.
+- Базовое терпение обычного клиента: `34 - min(day*1.5, 10)`.
+
+Всё остальное (штрафы, апгрейды и т.д.) — сознательно не перенесено на этом шаге, числа для них
+уже есть в `Database/project.sqlite` на будущее.
+
+## Как собрать сцену руками (сцены/префабов нет — это чисто код)
+
+1. **Игрок**: пустой GameObject + `CharacterController` + `PlayerController` + `PlayerInteraction`.
+   Дочерняя камера — в поле `playerCamera` обоих компонентов. Пустой дочерний объект-якорь
+   для переносимой коробки — в `handAnchor` у `PlayerInteraction`.
+2. **GameManager**: один объект на сцену с компонентом `GameManager`. Сейчас он сам вызывает
+   `StartShift(1)` в `Start()` — временная заглушка вместо меню (см. комментарий в коде),
+   уберите вызов, когда появится настоящий стартовый экран.
+3. **Docker/стеллажи**: объект с `DockSpawner` (укажите `boxPrefab` — обычный куб с `Box` + `Collider`),
+   24 объекта с `ShelfCell` (уникальный `label`, напр. "А1"…"В8") на полках.
+4. **Окна выдачи**: 2 объекта с `WindowStation`, у каждого — дочерний `customerStandPoint`
+   (точка, куда идёт клиент).
+5. **Клиенты**: объект с `CustomerSpawner`, `entryPoint` — точка входа, `exitPositionZ` — куда уходят,
+   `customerPrefab` — заготовка с компонентом `Customer` (капсула/примитив пока без анимаций).
+6. Raycast в `PlayerInteraction` бьёт по `Collider` — на `Box`/`ShelfCell`/`WindowStation` должны
+   быть коллайдеры (не триггеры обязательно, `Physics.Raycast` их видит в любом случае).
+7. UI подключается отдельно: `GameManager.OnMoneyChanged/OnRatingChanged/OnShiftTimeChanged/OnDayChanged`
+   и `PlayerInteraction.OnPromptChanged` — обычные `UnityEvent`, привязываются в инспекторе к
+   Text/TMP-полям без дополнительного кода.
