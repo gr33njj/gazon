@@ -36,6 +36,10 @@ namespace Gazon.Customers
 
         private void Update()
         {
+            // Защита от случая, когда объект с этим скриптом лежит в сцене без Initialize()
+            // (например, если при создании префаба забыли удалить исходный экземпляр из Hierarchy).
+            if (AssignedWindow == null) return;
+
             switch (State)
             {
                 case CustomerState.Entering:
