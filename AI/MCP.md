@@ -16,12 +16,17 @@
 - `git_get_status()`, `git_create_branch(name)`, `git_commit_files(paths, message)`.
 - Никаких `git push --force` / `reset --hard` тулов — если нужно что-то деструктивное, это делает человек руками.
 
-## Unity MCP (Actuator) — третий кандидат, самый сложный
-- Bridge: `HttpListener` на `localhost:12000`, поднимается изнутри `EditorApplication.update`.
-- Тулы: `instantiate_prefab`, `execute_menu_item`, `get_active_scene_hierarchy`, `read_editor_console`,
-  `trigger_play_mode`.
-- Инвариант: Unity Editor API однопоточный — каждый вызов должен ставиться в очередь и выполняться
-  на главном потоке редактора, никогда напрямую из потока Python-сервера.
+## Unity MCP (Actuator) — не пишем свою, ставим готовую (обновлено 2026-07-16)
+Не строим `HttpListener`-мост с нуля — есть готовое: **MCP for Unity**
+(github.com/CoplayDev/unity-mcp), MIT, Unity 2021.3 LTS–6.x. Установка: Package Manager →
+Add from git URL → `https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main`,
+дальше `Window → MCP for Unity → Configure All Detected Clients` — настроит клиент (Claude Code
+и т.д.) автоматически. Даёт ~47 тулов: сцена/GameObject, редактирование C# (через Roslyn), ассеты,
+тесты, профайлинг, билды.
+
+**Ограничение, а не деталь реализации**: агент должен быть запущен на той же машине, что и открытый
+Unity Editor (мост слушает localhost). Сессия на VPS до чужого localhost достучаться не может —
+значит, кто-то ставит Claude Code локально рядом с Unity и настраивает мост там же.
 
 ## Docs MCP (Brain) — по мере роста Docs/Design
 - Локальная векторная БД (ChromaDB/Qdrant + SentenceTransformers) поверх `Docs/` и `Design/`.
