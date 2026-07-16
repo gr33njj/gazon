@@ -7,6 +7,9 @@ using UnityEngine;
 namespace Gazon.World
 {
     /// <summary>Одна ячейка стеллажа (в MVP — 3 стеллажа x 8 ячеек = 24 штуки, метки вида "А3").</summary>
+    // BoxCollider (не abstract Collider — иначе Unity не сможет добавить его автоматически) нужен,
+    // чтобы Physics.Raycast из PlayerInteraction видел эту ячейку.
+    [RequireComponent(typeof(BoxCollider))]
     public class ShelfCell : MonoBehaviour, IInteractable
     {
         private static readonly List<ShelfCell> AllCells = new List<ShelfCell>();

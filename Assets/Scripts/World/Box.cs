@@ -15,6 +15,7 @@ namespace Gazon.World
     }
 
     /// <summary>Коробка. Жизненный цикл: Dock -> Carried -> OnShelf -> Carried -> HandedOver.</summary>
+    [RequireComponent(typeof(BoxCollider))] // нужен коллайдер, чтобы Physics.Raycast из PlayerInteraction её видел
     public class Box : MonoBehaviour, IInteractable
     {
         private static readonly List<Box> AllBoxes = new List<Box>();

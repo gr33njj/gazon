@@ -56,8 +56,11 @@
    (точка, куда идёт клиент).
 5. **Клиенты**: объект с `CustomerSpawner`, `entryPoint` — точка входа, `exitPositionZ` — куда уходят,
    `customerPrefab` — заготовка с компонентом `Customer` (капсула/примитив пока без анимаций).
-6. Raycast в `PlayerInteraction` бьёт по `Collider` — на `Box`/`ShelfCell`/`WindowStation` должны
-   быть коллайдеры (не триггеры обязательно, `Physics.Raycast` их видит в любом случае).
+6. Raycast в `PlayerInteraction` бьёт по `Collider` — `Box`/`ShelfCell`/`WindowStation` сами требуют
+   `BoxCollider` через `[RequireComponent]`, Unity добавит его автоматически при навешивании скрипта
+   на пустой объект (руками добавлять не нужно).
 7. UI подключается отдельно: `GameManager.OnMoneyChanged/OnRatingChanged/OnShiftTimeChanged/OnDayChanged`
    и `PlayerInteraction.OnPromptChanged` — обычные `UnityEvent`, привязываются в инспекторе к
-   Text/TMP-полям без дополнительного кода.
+   Text/TMP-полям без дополнительного кода. Пока настоящего UI нет — на любой объект сцены повесьте
+   `Core/DebugHud.cs`: он через `OnGUI()` без всякого Canvas/TMP печатает деньги/рейтинг/таймер и
+   подсказку `[E] ...` прямо поверх Game-вида. Уберите/замените, когда дойдёт очередь до нормального UI.

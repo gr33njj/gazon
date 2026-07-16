@@ -8,6 +8,7 @@ using UnityEngine;
 namespace Gazon.World
 {
     /// <summary>Окно выдачи (в MVP их 2). Игрок приносит сюда коробку клиента, который у окна ждёт.</summary>
+    [RequireComponent(typeof(BoxCollider))] // нужен коллайдер, чтобы Physics.Raycast из PlayerInteraction её видел
     public class WindowStation : MonoBehaviour, IInteractable
     {
         private static readonly List<WindowStation> AllWindows = new List<WindowStation>();
