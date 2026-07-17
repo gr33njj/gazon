@@ -129,9 +129,21 @@ WebGL — не побайтово то же самое, что билд для S
   `-executeMethod Gazon.EditorTools.BuildScript.BuildWebGLCI` для CI (отдельный метод — возвращает код
   выхода процессу, чтобы GitHub Actions понимал успех/провал).
 - `.github/workflows/webgl-build.yml` — ручной запуск (`workflow_dispatch`), собирает WebGL на раннере,
-  результат кладёт как GitHub Actions artifact (самый простой вариант доставки результата — не требует
-  новой SSH-авторизации). Заливку сразу на VPS статикой через Tailscale ещё не сделали — это следующий
-  шаг, когда понадобится, чтобы панель отдавала билд как страницу, а не просто zip-артефакт для скачивания.
+  результат кладёт как GitHub Actions artifact.
+- **Доставка на VPS — не через SSH/scp, а через HTTPS.** Пробовали PC → VPS по SSH (порт 22) — тот же
+  AmneziaVPN на раннере рвёт исходящий SSH (мгновенный `Permission denied` на Tailscale-адрес, зависание
+  на публичном IP), при этом HTTPS через тот же VPN работает нормально (иначе не работал бы сам Claude
+  Code). Решение: на VPS поднят маленький Node-сервис `/opt/gazon-upload` (systemd `gazon-upload.service`,
+  слушает `127.0.0.1:8899`, только пользователь `gazon-deploy`, без root) — принимает zip по `PUT` с
+  bearer-токеном (GitHub secret `GAZON_UPLOAD_TOKEN`), распаковывает в `/var/www/gazon-preview`. nginx
+  проксирует `https://ai.gr33njj.dev/upload`. Workflow после сборки: `Compress-Archive` → `curl.exe -X PUT`.
+  Попутные грабли: `unzip` возвращает код `1` (не 0) при предупреждениях о бэкслешах в путях из
+  Windows-архивов — это «успех с предупреждением», не провал; `execFileSync` кидает на любой ненулевой
+  код, пришлось переключиться на `spawnSync` с ручной проверкой (`status >= 2` — настоящая ошибка).
+  Также Unity по умолчанию сжимает WebGL-билд в Brotli (`.wasm.br`/`.data.br`/`.js.br`) — без
+  `Content-Encoding: br` в nginx браузер не распакует файлы и игра зависнет на progress bar.
+- **Живой пример**: https://ai.gr33njj.dev — первая рабочая страница с играбельным WebGL-превью,
+  залитая полностью автоматически из workflow (не руками).
 - **2026-07-17, первая успешная сборка end-to-end** (run [29585024189](https://github.com/gr33njj/gazon/actions/runs/29585024189),
   56 сек, артефакт `webgl-preview` ~4.9 МБ). По пути нашли и починили реальный и не самый очевидный баг:
   PowerShell-вызов `& "Unity.exe" ...` возвращал управление через ~2 сек после старта (когда закрывался
