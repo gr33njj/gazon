@@ -1,0 +1,37 @@
+name: WebGL preview build
+
+# Пока запуск только вручную (кнопка Run workflow на GitHub, или `gh workflow run`).
+# Когда появится панель ai.gr33njj.dev — она будет дёргать этот же workflow через GitHub API,
+# см. Docs/Architecture.md, раздел «Превью билда прямо в браузере».
+on:
+  workflow_dispatch:
+
+jobs:
+  build-webgl:
+    # Только наш self-hosted раннер на ПК — там же стоит Unity, тут его быть не может.
+    runs-on: [self-hosted, Windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Собрать WebGL через Unity batch mode
+        shell: powershell
+        env:
+          # Поправь путь, если Unity Hub поставил редактор в другое место.
+          UNITY_PATH: "C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.4f1\\Editor\\Unity.exe"
+        run: |
+          & "$env:UNITY_PATH" -batchmode -nographics -quit `
+            -projectPath "$PWD" `
+            -executeMethod Gazon.EditorTools.BuildScript.BuildWebGLCI `
+            -logFile -
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unity build exited with code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+      - name: Загрузить билд как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: webgl-preview
+          path: Build/WebGL
+          retention-days: 14
