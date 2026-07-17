@@ -55,3 +55,4 @@ __pycache__/
 unity_build_log.txt
 unity_build.log
 ci_manual_test.log
+webgl-upload.zip

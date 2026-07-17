@@ -58,3 +58,23 @@ jobs:
           name: webgl-preview
           path: Build/WebGL
           retention-days: 14
+
+      - name: Залить билд на ai.gr33njj.dev
+        shell: powershell
+        env:
+          UPLOAD_TOKEN: ${{ secrets.GAZON_UPLOAD_TOKEN }}
+        run: |
+          # HTTPS (443), не SSH/scp (порт 22) — на этом раннере полнотуннельный VPN рвёт/роняет
+          # исходящий SSH, а HTTPS проходит нормально (иначе не работал бы сам Claude Code).
+          # См. Docs/Architecture.md, раздел «Связь VPS ↔ домашний ПК».
+          Compress-Archive -Path "Build/WebGL/*" -DestinationPath webgl-upload.zip -Force
+          curl.exe -sS -X PUT `
+            -H "Authorization: Bearer $env:UPLOAD_TOKEN" `
+            --data-binary "@webgl-upload.zip" `
+            https://ai.gr33njj.dev/upload `
+            -w "`nHTTP:%{http_code}`n" `
+            -f
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Upload failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
