@@ -26,11 +26,18 @@ jobs:
           # Поправь путь, если Unity Hub поставил редактор в другое место.
           UNITY_PATH: "C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.4f1\\Editor\\Unity.exe"
         run: |
-          & "$env:UNITY_PATH" -batchmode -nographics -quit `
-            -projectPath "$PWD" `
-            -executeMethod Gazon.EditorTools.BuildScript.BuildWebGLCI `
-            -logFile unity_build.log
-          $exitCode = $LASTEXITCODE
+          # & "Unity.exe" ... не годится: PowerShell возвращает управление, как только
+          # закрывается поток STDOUT/STDERR (это происходит рано, Unity ещё вовсю работает
+          # через дочерние процессы bee_backend/netcorerun) — раннер решает, что шаг завершён,
+          # и убивает всё дерево процессов Unity как "осиротевшее" посреди сборки.
+          # Start-Process -Wait ждёт реального завершения процесса по его handle, а не по потоку.
+          $proc = Start-Process -FilePath "$env:UNITY_PATH" -ArgumentList @(
+            "-batchmode", "-nographics", "-quit",
+            "-projectPath", "$PWD",
+            "-executeMethod", "Gazon.EditorTools.BuildScript.BuildWebGLCI",
+            "-logFile", "unity_build.log"
+          ) -Wait -PassThru -NoNewWindow
+          $exitCode = $proc.ExitCode
           Get-Content unity_build.log -Tail 200
           if ($exitCode -ne 0) {
             Write-Error "Unity build exited with code $exitCode"
