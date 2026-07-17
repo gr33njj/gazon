@@ -1,6 +1,7 @@
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Gazon.EditorTools
@@ -27,11 +28,34 @@ namespace Gazon.EditorTools
         }
 
         /// <summary>Точка входа для батч-режима (GitHub Actions runner) — завершает процесс с кодом
-        /// возврата, чтобы CI понимал, провалилась сборка или нет.</summary>
+        /// возврата, чтобы CI понимал, провалилась сборка или нет. Перед сборкой пересобирает сцену
+        /// из SceneBuilder.BuildScene() (см. RegenerateScene) - иначе правки, которые headless-агент
+        /// вносит в SceneBuilder.cs, никогда не попадут в реально собранную сцену: агент не может
+        /// нажать пункт меню в открытом Editor, а без пересборки CI просто берёт старый .unity-файл
+        /// с диска как есть.</summary>
         public static void BuildWebGLCI()
         {
+            RegenerateScene();
             var result = Build();
             EditorApplication.Exit(result == BuildResult.Succeeded ? 0 : 1);
+        }
+
+        /// <summary>Создаёт чистую временную сцену, строит её через SceneBuilder.BuildScene() и
+        /// сохраняет поверх сцены, указанной в EditorBuildSettings. После этого SceneBuilder.cs -
+        /// единственный источник истины для CI-сборки: любые правки .unity-файла, сделанные вручную
+        /// в Editor и не перенесённые в код SceneBuilder, будут перезаписаны следующим CI-прогоном.</summary>
+        private static void RegenerateScene()
+        {
+            var scenePath = EditorBuildSettings.scenes.FirstOrDefault(s => s.enabled)?.path;
+            if (string.IsNullOrEmpty(scenePath))
+            {
+                Debug.LogError("В EditorBuildSettings нет включённой сцены - нечего пересобирать.");
+                return;
+            }
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            SceneBuilder.BuildScene();
+            EditorSceneManager.SaveScene(scene, scenePath);
         }
 
         private static BuildResult Build()
