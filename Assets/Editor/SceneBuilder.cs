@@ -18,6 +18,22 @@ namespace Gazon.EditorTools
     public static class SceneBuilder
     {
         private const string PrefabFolder = "Assets/Prefabs";
+        private const string MaterialFolder = "Assets/Materials";
+
+        // Стеллажи: см. Design/World/pvz_layout.md — 3 шт. (А/Б/В), длина 6, глубина 0.7,
+        // 8 ячеек на стеллаж. Расстановка в комнате (кто где стоит по X/Z) — решение SceneBuilder'а,
+        // в layout-доке её нет; при достройке стен (Phase 2) проверить на глаз с реальным персонажем.
+        private static readonly string[] ShelfLetters = { "А", "Б", "В" };
+        private const int CellsPerShelf = 8;
+        private const float ShelfLength = 6f;
+        private const float ShelfDepth = 0.7f;
+        private const float ShelfCellHeight = 0.8f;
+        private const float ShelfBottomY = 0.9f;
+        private const float BoardThickness = 0.05f;
+        private const float PostThickness = 0.08f;
+        private const float ShelfCenterX = -6f;
+        private const float ShelfFirstRowZ = -3.2f;
+        private const float ShelfRowSpacing = 2.5f;
 
         [MenuItem("Gazon/Собрать сцену вертикального среза")]
         public static void BuildScene()
@@ -130,16 +146,107 @@ namespace Gazon.EditorTools
             SetPrivateField(spawner, "boxPrefab", boxPrefab.GetComponent<Box>());
         }
 
+        /// <summary>3 стеллажа (А/Б/В) по 8 ячеек = 24 ячейки, каждый — с видимым каркасом
+        /// (стойки, полки, перегородки), а не голыми пустыми GameObject'ами.</summary>
         private static void BuildShelfCells()
         {
-            var labels = new[] { "A1", "A2", "A3" };
-            for (int i = 0; i < labels.Length; i++)
+            var shelvesRoot = new GameObject("Shelves");
+            var shelfMaterial = CreateShelfMaterial();
+
+            for (int s = 0; s < ShelfLetters.Length; s++)
             {
-                var go = new GameObject($"ShelfCell_{labels[i]}");
-                go.transform.position = new Vector3(2f + i * 0.6f, 1f, 0f);
-                var cell = go.AddComponent<ShelfCell>();
-                SetPrivateField(cell, "label", labels[i]);
+                var z = ShelfFirstRowZ + s * ShelfRowSpacing;
+                BuildShelfUnit(shelvesRoot.transform, ShelfLetters[s], new Vector3(ShelfCenterX, 0f, z), shelfMaterial);
             }
+        }
+
+        private static void BuildShelfUnit(Transform parent, string letter, Vector3 position, Material material)
+        {
+            var shelfRoot = new GameObject($"Shelf_{letter}");
+            shelfRoot.transform.SetParent(parent);
+            shelfRoot.transform.position = position;
+
+            var cellWidth = ShelfLength / CellsPerShelf;
+            var halfLength = ShelfLength / 2f;
+            var topY = ShelfBottomY + ShelfCellHeight;
+            var midY = (ShelfBottomY + topY) / 2f;
+
+            CreatePanel(shelfRoot.transform, "BackPanel", material,
+                new Vector3(0f, midY, -ShelfDepth / 2f), new Vector3(ShelfLength, ShelfCellHeight, BoardThickness));
+            CreatePanel(shelfRoot.transform, "BottomBoard", material,
+                new Vector3(0f, ShelfBottomY, 0f), new Vector3(ShelfLength, BoardThickness, ShelfDepth));
+            CreatePanel(shelfRoot.transform, "TopBoard", material,
+                new Vector3(0f, topY, 0f), new Vector3(ShelfLength, BoardThickness, ShelfDepth));
+
+            // 9 стоек на 8 ячеек (края + перегородки между ними).
+            for (int i = 0; i <= CellsPerShelf; i++)
+            {
+                var postX = -halfLength + i * cellWidth;
+                var name = i == 0 ? "PostStart" : i == CellsPerShelf ? "PostEnd" : $"Divider{i}";
+                CreatePanel(shelfRoot.transform, name, material,
+                    new Vector3(postX, midY, 0f), new Vector3(PostThickness, ShelfCellHeight, ShelfDepth));
+                CreatePanel(shelfRoot.transform, $"{name}_Leg", material,
+                    new Vector3(postX, ShelfBottomY / 2f, 0f), new Vector3(PostThickness, ShelfBottomY, PostThickness));
+            }
+
+            BuildShelfSign(shelfRoot.transform, letter, topY);
+
+            for (int i = 0; i < CellsPerShelf; i++)
+            {
+                var cellX = -halfLength + cellWidth * (i + 0.5f);
+                var go = new GameObject($"ShelfCell_{letter}{i + 1}");
+                go.transform.SetParent(shelfRoot.transform);
+                go.transform.localPosition = new Vector3(cellX, midY, 0f);
+
+                var collider = go.AddComponent<BoxCollider>();
+                collider.size = new Vector3(cellWidth * 0.9f, ShelfCellHeight * 0.9f, ShelfDepth * 0.9f);
+
+                var cell = go.AddComponent<ShelfCell>();
+                SetPrivateField(cell, "label", $"{letter}{i + 1}");
+            }
+        }
+
+        private static GameObject CreatePanel(Transform parent, string name, Material material, Vector3 localPosition, Vector3 size)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent);
+            go.transform.localPosition = localPosition;
+            go.transform.localScale = size;
+
+            var renderer = go.GetComponent<Renderer>();
+            if (material != null) renderer.sharedMaterial = material;
+
+            return go;
+        }
+
+        private static void BuildShelfSign(Transform parent, string letter, float topY)
+        {
+            var go = new GameObject($"Sign_{letter}");
+            go.transform.SetParent(parent);
+            go.transform.localPosition = new Vector3(0f, topY + 0.3f, ShelfDepth / 2f);
+
+            var textMesh = go.AddComponent<TextMesh>();
+            textMesh.text = letter;
+            textMesh.characterSize = 0.3f;
+            textMesh.fontSize = 48;
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.color = Color.white;
+        }
+
+        private static Material CreateShelfMaterial()
+        {
+            EnsureFolder(MaterialFolder);
+
+            var path = $"{MaterialFolder}/ShelfWood.mat";
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null) return existing;
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var material = new Material(shader) { name = "ShelfWood", color = new Color(0.5f, 0.33f, 0.2f) };
+            AssetDatabase.CreateAsset(material, path);
+            return material;
         }
 
         private static WindowStation[] BuildWindows()
