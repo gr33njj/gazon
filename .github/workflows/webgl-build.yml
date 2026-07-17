@@ -29,11 +29,21 @@ jobs:
           & "$env:UNITY_PATH" -batchmode -nographics -quit `
             -projectPath "$PWD" `
             -executeMethod Gazon.EditorTools.BuildScript.BuildWebGLCI `
-            -logFile -
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Unity build exited with code $LASTEXITCODE"
-            exit $LASTEXITCODE
+            -logFile unity_build.log
+          $exitCode = $LASTEXITCODE
+          Get-Content unity_build.log -Tail 200
+          if ($exitCode -ne 0) {
+            Write-Error "Unity build exited with code $exitCode"
+            exit $exitCode
           }
+
+      - name: Лог сборки (даже если упало)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log
+          path: unity_build.log
+          retention-days: 14
 
       - name: Загрузить билд как артефакт
         uses: actions/upload-artifact@v4

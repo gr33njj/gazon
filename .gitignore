@@ -53,3 +53,5 @@ __pycache__/
 
 # Локальные логи ручных прогонов Unity batch-mode
 unity_build_log.txt
+unity_build.log
+ci_manual_test.log
