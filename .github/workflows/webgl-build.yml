@@ -13,6 +13,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # По умолчанию checkout чистит рабочую папку (git clean -ffdx) перед каждым прогоном,
+          # что стирает Library/ (гитигнорится) и заставляет Unity переимпортировать всё с нуля —
+          # именно на этом переимпорте раннер падал. clean: false сохраняет Library между прогонами,
+          # как это уже работает в обычной локальной папке проекта.
+          clean: false
 
       - name: Собрать WebGL через Unity batch mode
         shell: powershell
