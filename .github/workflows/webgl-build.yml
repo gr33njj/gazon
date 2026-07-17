@@ -13,6 +13,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # По умолчанию checkout чистит рабочую папку (git clean -ffdx) перед каждым прогоном,
+          # что стирает Library/ (гитигнорится) и заставляет Unity переимпортировать всё с нуля —
+          # именно на этом переимпорте раннер падал. clean: false сохраняет Library между прогонами,
+          # как это уже работает в обычной локальной папке проекта.
+          clean: false
 
       - name: Собрать WebGL через Unity batch mode
         shell: powershell
@@ -20,14 +26,31 @@ jobs:
           # Поправь путь, если Unity Hub поставил редактор в другое место.
           UNITY_PATH: "C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.4f1\\Editor\\Unity.exe"
         run: |
-          & "$env:UNITY_PATH" -batchmode -nographics -quit `
-            -projectPath "$PWD" `
-            -executeMethod Gazon.EditorTools.BuildScript.BuildWebGLCI `
-            -logFile -
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Unity build exited with code $LASTEXITCODE"
-            exit $LASTEXITCODE
+          # & "Unity.exe" ... не годится: PowerShell возвращает управление, как только
+          # закрывается поток STDOUT/STDERR (это происходит рано, Unity ещё вовсю работает
+          # через дочерние процессы bee_backend/netcorerun) — раннер решает, что шаг завершён,
+          # и убивает всё дерево процессов Unity как "осиротевшее" посреди сборки.
+          # Start-Process -Wait ждёт реального завершения процесса по его handle, а не по потоку.
+          $proc = Start-Process -FilePath "$env:UNITY_PATH" -ArgumentList @(
+            "-batchmode", "-nographics", "-quit",
+            "-projectPath", "$PWD",
+            "-executeMethod", "Gazon.EditorTools.BuildScript.BuildWebGLCI",
+            "-logFile", "unity_build.log"
+          ) -Wait -PassThru -NoNewWindow
+          $exitCode = $proc.ExitCode
+          Get-Content unity_build.log -Tail 200
+          if ($exitCode -ne 0) {
+            Write-Error "Unity build exited with code $exitCode"
+            exit $exitCode
           }
+
+      - name: Лог сборки (даже если упало)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log
+          path: unity_build.log
+          retention-days: 14
 
       - name: Загрузить билд как артефакт
         uses: actions/upload-artifact@v4
@@ -35,3 +58,23 @@ jobs:
           name: webgl-preview
           path: Build/WebGL
           retention-days: 14
+
+      - name: Залить билд на ai.gr33njj.dev
+        shell: powershell
+        env:
+          UPLOAD_TOKEN: ${{ secrets.GAZON_UPLOAD_TOKEN }}
+        run: |
+          # HTTPS (443), не SSH/scp (порт 22) — на этом раннере полнотуннельный VPN рвёт/роняет
+          # исходящий SSH, а HTTPS проходит нормально (иначе не работал бы сам Claude Code).
+          # См. Docs/Architecture.md, раздел «Связь VPS ↔ домашний ПК».
+          Compress-Archive -Path "Build/WebGL/*" -DestinationPath webgl-upload.zip -Force
+          curl.exe -sS -X PUT `
+            -H "Authorization: Bearer $env:UPLOAD_TOKEN" `
+            --data-binary "@webgl-upload.zip" `
+            https://ai.gr33njj.dev/upload `
+            -w "`nHTTP:%{http_code}`n" `
+            -f
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Upload failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
