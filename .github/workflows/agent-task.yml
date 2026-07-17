@@ -1,0 +1,64 @@
+name: Agent task
+
+# Запускается панелью (ai.gr33njj.dev) через workflow_dispatch с текстом задачи.
+# Агент правит код и коммитит ПРЯМО в main без Pull Request - осознанный выбор ради скорости
+# (см. Docs/Decisions.md). Откат при ошибке - вручную через git revert.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Что сделать (текст задачи от панели)"
+        required: true
+
+jobs:
+  run-agent:
+    runs-on: [self-hosted, Windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Запустить Claude Code
+        shell: powershell
+        env:
+          TASK: ${{ inputs.task }}
+        run: |
+          # --dangerously-skip-permissions: без этого claude будет ждать интерактивного
+          # подтверждения на каждое действие (правку файла, запуск команды), которого
+          # в CI никто не даст. Осознанный риск, тот же, что и с прямым коммитом в main.
+          # MCP for Unity доступен только если на этом ПК в это же время открыт Unity Editor -
+          # для чисто кодовых задач (C#-скрипты, без сцены) это не требуется.
+          claude -p "$env:TASK" --dangerously-skip-permissions
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "claude exited with code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+      - name: Закоммитить и запушить в main (если есть изменения)
+        shell: powershell
+        run: |
+          git config user.name "gazon-agent"
+          git config user.email "agent@gr33njj.dev"
+          $changes = git status --porcelain
+          if ($changes) {
+            $firstLine = ($env:TASK -split "`n")[0]
+            git add -A
+            git commit -m "Agent: $firstLine"
+            git push origin main
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "committed_and_pushed=true"
+          } else {
+            Write-Output "Изменений нет - агент ничего не поменял в файлах."
+          }
+        env:
+          TASK: ${{ inputs.task }}
+        id: commit
+
+      - name: Запустить сборку WebGL-превью (если были изменения)
+        if: steps.commit.outputs.committed_and_pushed == 'true'
+        shell: powershell
+        run: |
+          # secrets.GITHUB_TOKEN тут не подходит - им нельзя триггерить другие workflow
+          # (защита GitHub от бесконечных циклов). Используем gh CLI, уже авторизованный
+          # на этом раннере (тот же аккаунт, что настраивали для self-hosted runner).
+          gh workflow run webgl-build.yml --repo gr33njj/gazon
