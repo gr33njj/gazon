@@ -50,3 +50,6 @@ __pycache__/
 # Local secrets / env
 .env
 .env.local
+
+# Локальные логи ручных прогонов Unity batch-mode
+unity_build_log.txt
