@@ -310,11 +310,32 @@ namespace Gazon.UI
         private void DrawPanels()
         {
             if (InputLock.PhoneOpen) DrawPhone();
+
+            // Перекур блэкаутит экран целиком — рисовать под ним диалоги мини-игр
+            // означает наложение текста "Перекур" на текст крокодила/Глаза Бога.
+            if (InputLock.SmokeActive) { DrawSmoke(); return; }
+
             var mc = MinigameController.Instance;
-            if (mc.BabkaTarget != null) DrawBabka();
-            if (mc.EyeTarget != null) DrawEye();
+            bool showBabka = mc.BabkaTarget != null;
+            bool showEye = mc.EyeTarget != null;
+
+            // Крокодил и «Глаз Бога» раньше рисовались в одном и том же Rect — если два разных
+            // окна выдачи одновременно триггерили обе мини-игры для разных клиентов, их тексты
+            // полностью накладывались друг на друга. Теперь активные панели складываются в стопку.
+            const float dialogW = 460f, dialogH = 220f, gap = 14f;
+            int count = (showBabka ? 1 : 0) + (showEye ? 1 : 0);
+            float totalH = count * dialogH + Mathf.Max(0, count - 1) * gap;
+            float y = Screen.height - totalH - 70f;
+
+            if (showBabka)
+            {
+                DrawBabka(new Rect((Screen.width - dialogW) / 2f, y, dialogW, dialogH));
+                y += dialogH + gap;
+            }
+            if (showEye)
+                DrawEye(new Rect((Screen.width - dialogW) / 2f, y, dialogW, dialogH));
+
             if (mc.QteTarget != null) DrawQte();
-            if (InputLock.SmokeActive) DrawSmoke();
         }
 
         private void DrawPhone()
@@ -377,11 +398,9 @@ namespace Gazon.UI
             GUILayout.EndHorizontal();
         }
 
-        private void DrawBabka()
+        private void DrawBabka(Rect rect)
         {
             var mc = MinigameController.Instance;
-            float w = 460, h = 220;
-            var rect = new Rect((Screen.width - w) / 2f, Screen.height - h - 70, w, h);
             GUI.Box(rect, "");
             GUILayout.BeginArea(rect);
             GUILayout.Label("🧓 Крокодил с бабушкой", BoldLabel());
@@ -394,11 +413,9 @@ namespace Gazon.UI
             GUILayout.EndArea();
         }
 
-        private void DrawEye()
+        private void DrawEye(Rect rect)
         {
             var mc = MinigameController.Instance;
-            float w = 460, h = 220;
-            var rect = new Rect((Screen.width - w) / 2f, Screen.height - h - 70, w, h);
             GUI.Box(rect, "");
             GUILayout.BeginArea(rect);
             GUILayout.Label("👁 «Глаз Бога» (пиратская версия)", BoldLabel());

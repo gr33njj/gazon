@@ -62,6 +62,7 @@ namespace Gazon.EditorTools
             BuildFittingRoom();
             BuildSmokeDoor(player.GetComponent<PlayerBuffs>());
             BuildCustomerSpawner(customerPrefab);
+            BuildCellHighlight();
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             Debug.Log("Сцена собрана. Сохрани её (Ctrl+S) и нажми Play.");
@@ -72,7 +73,11 @@ namespace Gazon.EditorTools
         private static GameObject BuildPlayer()
         {
             var player = new GameObject("Player");
-            player.transform.position = new Vector3(13f, 1f, 11.5f); // MVP: P.x=13,z=11.5
+            // Y=0 (пол) — CharacterController по умолчанию center=(0,1,0)/height=2, значит его
+            // нижняя точка окажется ровно на полу. Раньше здесь стоял y=1, из-за чего игрок
+            // висел на метр над полом, а камера (y=1.6 локально) оказывалась на 2.6 — отсюда
+            // и ощущение "я какой-то высокий" в новой полноразмерной комнате.
+            player.transform.position = new Vector3(13f, 0f, 11.5f); // MVP: P.x=13,z=11.5
 
             player.AddComponent<CharacterController>();
             var interaction = player.AddComponent<PlayerInteraction>();
@@ -94,7 +99,7 @@ namespace Gazon.EditorTools
                 camGO.tag = "MainCamera";
                 camGO.transform.SetParent(player.transform);
             }
-            camGO.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+            camGO.transform.localPosition = new Vector3(0f, RoomLayout.EyeHeight, 0f); // MVP: EYE=1.7
             camGO.transform.localRotation = Quaternion.identity;
 
             var handAnchor = new GameObject("HandAnchor");
@@ -364,6 +369,38 @@ namespace Gazon.EditorTools
             var controllerGO = new GameObject("SmokeBreakController");
             var controller = controllerGO.AddComponent<SmokeBreakController>();
             SetPrivateField(controller, "playerBuffs", playerBuffs);
+        }
+
+        // ---------- Подсветка целевой ячейки для несомой коробки ----------
+
+        /// <summary>Порт hlBox/hlArrow из MVP: зелёный маркер на полке + вращающийся индикатор
+        /// над ней, показывается пока игрок несёт коробку с докстанции к назначенной ячейке.
+        /// Без коллайдеров — иначе перекрыл бы raycast до самой ShelfCell под ним.</summary>
+        private static void BuildCellHighlight()
+        {
+            var mat = CreateMaterial("CellHighlight", new Color(0.2f, 1f, 0.5f));
+            var root = new GameObject("CellHighlight");
+            var highlight = root.AddComponent<CellHighlight>();
+
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            marker.name = "Marker";
+            marker.transform.SetParent(root.transform);
+            marker.transform.localScale = new Vector3(ShelfLength / CellsPerShelf * 0.9f, 0.06f, ShelfDepth * 0.95f);
+            Object.DestroyImmediate(marker.GetComponent<BoxCollider>());
+            marker.GetComponent<Renderer>().sharedMaterial = mat;
+            marker.SetActive(false);
+
+            var arrow = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            arrow.name = "Arrow";
+            arrow.transform.SetParent(root.transform);
+            arrow.transform.localScale = new Vector3(0.18f, 0.18f, 0.18f);
+            arrow.transform.localRotation = Quaternion.Euler(45f, 0f, 45f);
+            Object.DestroyImmediate(arrow.GetComponent<BoxCollider>());
+            arrow.GetComponent<Renderer>().sharedMaterial = mat;
+            arrow.SetActive(false);
+
+            SetPrivateField(highlight, "marker", marker.transform);
+            SetPrivateField(highlight, "arrow", arrow.transform);
         }
 
         // ---------- Клиенты ----------
