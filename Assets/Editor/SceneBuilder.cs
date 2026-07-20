@@ -37,6 +37,11 @@ namespace Gazon.EditorTools
         // Unity Registry → "glTFast"), иначе LoadModel просто залогирует ошибку и пропустит пропы.
         private const string KayKitCityFolder = "Assets/ThirdPatry/KayKit_City_Builder_Bits_1.0_FREE/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf";
 
+        // Data-driven предположение по замеру Bounds WarehouseShelving.obj (см. BuildShelfUnit) —
+        // не проверено вживую. local Y модели (самая большая измеренная ось) → мировой X (длина),
+        // local Z (средняя) → мировой Y (высота). Если криво — крутить это значение.
+        private static readonly Quaternion ShelfModelRotation = Quaternion.LookRotation(Vector3.up, Vector3.right);
+
         private const int CellsPerShelf = RoomLayout.CellsPerRack;
         private const float ShelfLength = RoomLayout.RackLength;
         private const float ShelfDepth = RoomLayout.RackDepth;
@@ -248,6 +253,14 @@ namespace Gazon.EditorTools
             var visual = InstantiateModel(ShelfModelPath, shelfRoot.transform);
             if (visual != null)
             {
+                // Диагностика по логу CI (2026-07-20): необращённый замер модели дал
+                // (0.87, 2.44, 2.13) — по рангу размеров видно, что "родная" длинная ось
+                // модели — её local Y (2.44, самая большая), а не наш X. Из-за этого
+                // независимый стретч по X/Y/Z корёжил стеллаж в нечитаемое месиво.
+                // ShelfModelRotation — попытка выровнять оси по замеру (local Y → X длина,
+                // local Z → Y высота), НЕ проверено визуально. Если стеллаж развёрнут не
+                // той стороной/выглядит криво — покрути это значение (90°/180° по Y).
+                visual.transform.localRotation = ShelfModelRotation;
                 FitToSizeStretch(visual, new Vector3(ShelfLength, topY, ShelfDepth));
                 GroundAt(visual, 0f);
             }
@@ -276,12 +289,20 @@ namespace Gazon.EditorTools
             // рендерится корректно в обоих пайплайнах — НО только если в проекте хоть раз
             // импортировали TMP Essential Resources (Window → TextMeshPro → Import TMP
             // Essential Resources). Без этого TMP_Settings.defaultFontAsset == null, новый
-            // TextMeshPro остаётся без шрифта и не рисует ни одного глифа.
-            if (TMPro.TMP_Settings.defaultFontAsset == null)
+            // TextMeshPro остаётся без шрифта и не рисует ни одного глифа. ВАЖНО: если TMP
+            // Settings вообще не существует как asset в проекте, сам геттер defaultFontAsset
+            // бросает NullReferenceException (проверено логом CI от 2026-07-20) — это раньше
+            // ронял ВСЮ сборку сцены целиком, а не только таблички. Оборачиваем в try/catch.
+            try
             {
-                Debug.LogError("TMP_Settings.defaultFontAsset == null — таблички стеллажей не будут " +
+                if (TMPro.TMP_Settings.defaultFontAsset == null)
+                    Debug.LogError("TMP_Settings.defaultFontAsset == null — таблички стеллажей не будут видны.");
+            }
+            catch (System.Exception)
+            {
+                Debug.LogError("TMP Settings asset отсутствует в проекте — таблички стеллажей не будут " +
                     "видны. Открой Window → TextMeshPro → Import TMP Essential Resources один раз в " +
-                    "этом проекте и запусти сборку сцены заново.");
+                    "этом проекте, закоммить появившиеся файлы и запусти сборку сцены заново.");
             }
 
             // WarehouseShelving.obj после FitToSizeStretch не даёт гарантии, какая сторона по Z —
