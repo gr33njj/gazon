@@ -7,6 +7,8 @@ using Gazon.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Gazon.EditorTools
 {
@@ -123,6 +125,13 @@ namespace Gazon.EditorTools
             camGO.transform.localPosition = new Vector3(0f, RoomLayout.EyeHeight, 0f); // MVP: EYE=1.7
             camGO.transform.localRotation = Quaternion.identity;
 
+            // URP выключает пост-обработку на камере по умолчанию (UniversalAdditionalCameraData.
+            // m_RenderPostProcessing = false) — без этого Volume ниже (BuildLighting →
+            // BuildPostProcessing) физически не применяется, сколько бы оверрайдов в нём ни было.
+            var camData = camGO.GetComponent<UniversalAdditionalCameraData>();
+            if (camData == null) camData = camGO.AddComponent<UniversalAdditionalCameraData>();
+            camData.renderPostProcessing = true;
+
             var handAnchor = new GameObject("HandAnchor");
             handAnchor.transform.SetParent(camGO.transform);
             handAnchor.transform.localPosition = new Vector3(0.3f, -0.3f, 0.7f);
@@ -161,6 +170,61 @@ namespace Gazon.EditorTools
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.5f, 0.52f, 0.58f);
+
+            BuildPostProcessing();
+        }
+
+        /// <summary>Global Volume с Color Adjustments/Bloom/Tonemapping — направленный свет + flat
+        /// ambient сами по себе дают физически корректную, но плоскую картинку без цветовой
+        /// пост-обработки. Требует renderPostProcessing=true на камере (см. BuildPlayer) и
+        /// postProcessData на активном UniversalRendererData (уже подключено в Assets/Settings/
+        /// PC_Renderer.asset) — без любого из двух Volume молча не даёт эффекта.</summary>
+        private static void BuildPostProcessing()
+        {
+            EnsureFolder(MaterialFolder);
+            const string profilePath = MaterialFolder + "/PostProcessProfile.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, profilePath);
+            }
+
+            var colorAdjustments = profile.Has<ColorAdjustments>() ? GetOverride<ColorAdjustments>(profile) : profile.Add<ColorAdjustments>(true);
+            colorAdjustments.postExposure.overrideState = true;
+            colorAdjustments.postExposure.value = 0.3f;
+            colorAdjustments.saturation.overrideState = true;
+            colorAdjustments.saturation.value = 15f;
+
+            var bloom = profile.Has<Bloom>() ? GetOverride<Bloom>(profile) : profile.Add<Bloom>(true);
+            bloom.threshold.overrideState = true;
+            bloom.threshold.value = 1.1f;
+            bloom.intensity.overrideState = true;
+            bloom.intensity.value = 0.25f;
+            bloom.scatter.overrideState = true;
+            bloom.scatter.value = 0.6f;
+
+            var tonemapping = profile.Has<Tonemapping>() ? GetOverride<Tonemapping>(profile) : profile.Add<Tonemapping>(true);
+            tonemapping.mode.overrideState = true;
+            tonemapping.mode.value = TonemappingMode.ACES;
+
+            EditorUtility.SetDirty(profile);
+
+            var volumeGO = new GameObject("GlobalVolume");
+            var volume = volumeGO.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 0f;
+            // sharedProfile, не profile: profile лениво инстанцирует РАНТАЙМ-копию в приватное
+            // несериализуемое поле — при сборке сцены в Editor это значило бы, что после закрытия
+            // Editor'а (или в headless-сборке CI) ссылка на ассет теряется и Volume остаётся без
+            // профиля. sharedProfile — единственное сериализуемое поле, реально сохраняющееся в сцену.
+            volume.sharedProfile = profile;
+        }
+
+        private static T GetOverride<T>(VolumeProfile profile) where T : VolumeComponent
+        {
+            profile.TryGet(out T component);
+            return component;
         }
 
         // ---------- Комната ----------
