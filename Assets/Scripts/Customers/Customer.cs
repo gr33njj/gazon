@@ -148,6 +148,14 @@ namespace Gazon.Customers
 
         private void MoveTowards(Vector3 targetPos)
         {
+            // Раньше клиент двигался без поворота модели — с капсулой это было незаметно,
+            // но с реальным гуманоидом (см. SceneBuilder.CreateCustomerPrefab) он бы скользил
+            // лицом в одну сторону при любом направлении движения.
+            var direction = targetPos - transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.0004f)
+                transform.rotation = Quaternion.LookRotation(direction.normalized);
+
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
         }
 

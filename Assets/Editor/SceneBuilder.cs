@@ -27,13 +27,17 @@ namespace Gazon.EditorTools
         private const string PrefabFolder = "Assets/Prefabs";
         private const string MaterialFolder = "Assets/Materials";
 
+        // Пути к сторонним ассетам из Assets/ThirdPatry (см. Docs/Decisions.md, визуальный
+        // проход 2026-07-20). Не понравится результат — меняется одной строкой здесь.
+        private const string BoxModelPath = "Assets/ThirdPatry/Box by Kenney - HvjissDrdr/box.obj";
+        private const string ShelfModelPath = "Assets/ThirdPatry/Shelves by J-Toastie - OD78iJOQoN/WarehouseShelving.obj";
+        private const string CustomerModelPath = "Assets/ThirdPatry/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Base Characters/Unity/Superhero_Male_FullBody.fbx";
+
         private const int CellsPerShelf = RoomLayout.CellsPerRack;
         private const float ShelfLength = RoomLayout.RackLength;
         private const float ShelfDepth = RoomLayout.RackDepth;
         private const float ShelfCellHeight = 0.8f;
         private const float ShelfBottomY = 0.9f;
-        private const float BoardThickness = 0.05f;
-        private const float PostThickness = 0.08f;
 
         [MenuItem("Gazon/Собрать сцену вертикального среза")]
         public static void BuildScene()
@@ -188,16 +192,15 @@ namespace Gazon.EditorTools
         private static void BuildShelves()
         {
             var shelvesRoot = new GameObject("Shelves");
-            var shelfMaterial = CreateMaterial("ShelfWood", new Color(0.5f, 0.33f, 0.2f));
 
             foreach (var rack in RoomLayout.Racks)
             {
                 var center = new Vector3(rack.X0 + ShelfLength / 2f, 0f, rack.Z + ShelfDepth / 2f);
-                BuildShelfUnit(shelvesRoot.transform, rack.Label, center, shelfMaterial);
+                BuildShelfUnit(shelvesRoot.transform, rack.Label, center);
             }
         }
 
-        private static void BuildShelfUnit(Transform parent, string letter, Vector3 position, Material material)
+        private static void BuildShelfUnit(Transform parent, string letter, Vector3 position)
         {
             var shelfRoot = new GameObject($"Shelf_{letter}");
             shelfRoot.transform.SetParent(parent);
@@ -208,21 +211,13 @@ namespace Gazon.EditorTools
             var topY = ShelfBottomY + ShelfCellHeight;
             var midY = (ShelfBottomY + topY) / 2f;
 
-            CreatePanel(shelfRoot.transform, "BackPanel", material,
-                new Vector3(0f, midY, -ShelfDepth / 2f), new Vector3(ShelfLength, ShelfCellHeight, BoardThickness));
-            CreatePanel(shelfRoot.transform, "BottomBoard", material,
-                new Vector3(0f, ShelfBottomY, 0f), new Vector3(ShelfLength, BoardThickness, ShelfDepth));
-            CreatePanel(shelfRoot.transform, "TopBoard", material,
-                new Vector3(0f, topY, 0f), new Vector3(ShelfLength, BoardThickness, ShelfDepth));
-
-            for (int i = 0; i <= CellsPerShelf; i++)
+            // Визуал — один готовый WarehouseShelving.obj вместо процедурных досок/стоек.
+            // ShelfCell-объекты ниже остаются логикой поверх него без изменений.
+            var visual = InstantiateModel(ShelfModelPath, shelfRoot.transform);
+            if (visual != null)
             {
-                var postX = -halfLength + i * cellWidth;
-                var name = i == 0 ? "PostStart" : i == CellsPerShelf ? "PostEnd" : $"Divider{i}";
-                CreatePanel(shelfRoot.transform, name, material,
-                    new Vector3(postX, midY, 0f), new Vector3(PostThickness, ShelfCellHeight, ShelfDepth));
-                CreatePanel(shelfRoot.transform, $"{name}_Leg", material,
-                    new Vector3(postX, ShelfBottomY / 2f, 0f), new Vector3(PostThickness, ShelfBottomY, PostThickness));
+                FitToSizeStretch(visual, new Vector3(ShelfLength, topY, ShelfDepth));
+                GroundAt(visual, 0f);
             }
 
             BuildShelfSign(shelfRoot.transform, letter, topY);
@@ -422,10 +417,21 @@ namespace Gazon.EditorTools
 
         private static GameObject CreateBoxPrefab()
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = "Box";
-            go.transform.localScale = new Vector3(0.4f, 0.3f, 0.4f);
+            // Корень — пустой объект с коллайдером под логику (Box.cs требует BoxCollider на
+            // себе для Physics.Raycast из PlayerInteraction); визуал — отдельный дочерний
+            // объект, чтобы смена модели никогда не задевала коллайдер/логику.
+            var go = new GameObject("Box");
+            var boxSize = new Vector3(0.4f, 0.3f, 0.4f);
+            var collider = go.AddComponent<BoxCollider>();
+            collider.size = boxSize;
             go.AddComponent<Box>();
+
+            var visual = InstantiateModel(BoxModelPath, go.transform);
+            if (visual != null)
+            {
+                FitToSizeStretch(visual, boxSize);
+                CenterAt(visual, Vector3.zero);
+            }
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabFolder}/Box.prefab");
             Object.DestroyImmediate(go);
@@ -434,9 +440,17 @@ namespace Gazon.EditorTools
 
         private static GameObject CreateCustomerPrefab()
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = "Customer";
+            var go = new GameObject("Customer");
             go.AddComponent<Customer>();
+
+            // Без анимаций (Mixamo-проход ещё впереди) — просто статичный меш, который
+            // едет за transform.position клиента; поворот к цели см. Customer.MoveTowards.
+            var visual = InstantiateModel(CustomerModelPath, go.transform);
+            if (visual != null)
+            {
+                FitToHeight(visual, 1.75f);
+                GroundAt(visual, 0f);
+            }
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabFolder}/Customer.prefab");
             Object.DestroyImmediate(go);
@@ -454,6 +468,87 @@ namespace Gazon.EditorTools
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabFolder}/Courier.prefab");
             Object.DestroyImmediate(go);
             return prefab;
+        }
+
+        // ---------- Сторонние модели (Assets/ThirdPatry) ----------
+
+        /// <summary>Грузит GameObject-ассет модели (FBX/OBJ). Логирует ошибку, если путь битый
+        /// (ассет переименовали/удалили) — иначе сцена молча соберётся без части геометрии.</summary>
+        private static GameObject LoadModel(string path)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (asset == null)
+                Debug.LogError($"Не найдена модель по пути '{path}' — проверь, что ассет всё ещё лежит там же.");
+            return asset;
+        }
+
+        /// <summary>Инстанцирует модель как дочерний объект в (0,0,0)/identity/scale=1 —
+        /// дальше вызывающий код сам подгоняет масштаб и позицию под нужный footprint.</summary>
+        private static GameObject InstantiateModel(string modelPath, Transform parent)
+        {
+            var model = LoadModel(modelPath);
+            if (model == null) return null;
+
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(model, parent);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            return instance;
+        }
+
+        private static Vector3 MeasureBoundsSize(GameObject instance, out Bounds bounds)
+        {
+            var renderers = instance.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                bounds = new Bounds(instance.transform.position, Vector3.zero);
+                return Vector3.zero;
+            }
+            bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            return bounds.size;
+        }
+
+        /// <summary>Растягивает модель по каждой оси независимо, чтобы точно попасть в
+        /// targetSize — годится для пропов (коробка/стеллаж), где важен игровой footprint,
+        /// а не оригинальные пропорции ассета. Снимает необходимость знать заранее, в каких
+        /// единицах измерения экспортирован конкретный ассет-пак.</summary>
+        private static void FitToSizeStretch(GameObject instance, Vector3 targetSize)
+        {
+            var size = MeasureBoundsSize(instance, out _);
+            var scale = instance.transform.localScale;
+            instance.transform.localScale = new Vector3(
+                size.x > 0.0001f ? scale.x * targetSize.x / size.x : scale.x,
+                size.y > 0.0001f ? scale.y * targetSize.y / size.y : scale.y,
+                size.z > 0.0001f ? scale.z * targetSize.z / size.z : scale.z);
+        }
+
+        /// <summary>Равномерно масштабирует модель так, чтобы её высота совпала с targetHeight,
+        /// сохраняя пропорции — обязательно для персонажей, иначе гуманоид расплющится.</summary>
+        private static void FitToHeight(GameObject instance, float targetHeight)
+        {
+            var size = MeasureBoundsSize(instance, out _);
+            if (size.y <= 0.0001f) return;
+            instance.transform.localScale *= targetHeight / size.y;
+        }
+
+        /// <summary>Сдвигает инстанс по мировой Y так, чтобы низ его фактического Bounds лёг
+        /// на floorLocalY — не важно, где у исходной модели пивот (пол/центр/что угодно).</summary>
+        private static void GroundAt(GameObject instance, float floorLocalY)
+        {
+            MeasureBoundsSize(instance, out var bounds);
+            instance.transform.position += new Vector3(0f, floorLocalY - bounds.min.y, 0f);
+        }
+
+        /// <summary>Центрирует Bounds инстанса на заданной локальной точке родителя — годится
+        /// для пропов вроде коробки, чей коллайдер тоже стоит центром в (0,0,0).</summary>
+        private static void CenterAt(GameObject instance, Vector3 parentLocalPoint)
+        {
+            MeasureBoundsSize(instance, out var bounds);
+            var worldTarget = instance.transform.parent != null
+                ? instance.transform.parent.TransformPoint(parentLocalPoint)
+                : parentLocalPoint;
+            instance.transform.position += worldTarget - bounds.center;
         }
 
         // ---------- Утилиты ----------
