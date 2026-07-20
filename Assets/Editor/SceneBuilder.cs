@@ -33,6 +33,10 @@ namespace Gazon.EditorTools
         private const string ShelfModelPath = "Assets/ThirdPatry/Shelves by J-Toastie - OD78iJOQoN/WarehouseShelving.obj";
         private const string CustomerModelPath = "Assets/ThirdPatry/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Base Characters/Unity/Superhero_Male_FullBody.fbx";
 
+        // KayKit City Builder Bits — целиком .gltf, нужен пакет glTFast (Package Manager →
+        // Unity Registry → "glTFast"), иначе LoadModel просто залогирует ошибку и пропустит пропы.
+        private const string KayKitCityFolder = "Assets/ThirdPatry/KayKit_City_Builder_Bits_1.0_FREE/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf";
+
         private const int CellsPerShelf = RoomLayout.CellsPerRack;
         private const float ShelfLength = RoomLayout.RackLength;
         private const float ShelfDepth = RoomLayout.RackDepth;
@@ -57,6 +61,7 @@ namespace Gazon.EditorTools
 
             var player = BuildPlayer();
             BuildManagers();
+            BuildLighting();
             BuildRoom();
             BuildShelves();
             var courierSpawner = BuildCourierSpawner(courierPrefab);
@@ -67,6 +72,7 @@ namespace Gazon.EditorTools
             BuildSmokeDoor(player.GetComponent<PlayerBuffs>());
             BuildCustomerSpawner(customerPrefab);
             BuildCellHighlight();
+            BuildStreetDressing();
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             Debug.Log("Сцена собрана. Сохрани её (Ctrl+S) и нажми Play.");
@@ -124,6 +130,26 @@ namespace Gazon.EditorTools
             go.AddComponent<MinigameController>();
             go.AddComponent<NightInventoryController>();
             go.AddComponent<GameUI>();
+        }
+
+        // ---------- Освещение ----------
+
+        /// <summary>BuildScene() стартует с EditorSceneManager.NewScene(EmptyScene) — а это
+        /// значит НИ ОДНОГО источника света на сцене (ни направленного, ни ambient-настроек).
+        /// Без этого весь URP-рендер держится на нулевой ambient-подсветке по умолчанию —
+        /// отсюда и "цвета не прям красочные": материалы физически не освещены.</summary>
+        private static void BuildLighting()
+        {
+            var sunGO = new GameObject("Sun");
+            var sun = sunGO.AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.color = Color.white;
+            sun.intensity = 1.3f;
+            sun.shadows = LightShadows.Soft;
+            sunGO.transform.rotation = Quaternion.Euler(55f, -25f, 0f);
+
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.5f, 0.52f, 0.58f);
         }
 
         // ---------- Комната ----------
@@ -239,17 +265,23 @@ namespace Gazon.EditorTools
 
         private static void BuildShelfSign(Transform parent, string letter, float topY)
         {
+            // TextMesh (legacy) использует "GUI/Text Shader" — Built-in-only, под URP не
+            // рендерится (отсюда "не подписанные ячейки"/невидимая табличка). TextMeshPro
+            // рендерится корректно в обоих пайплайнах.
             var go = new GameObject($"Sign_{letter}");
             go.transform.SetParent(parent);
             go.transform.localPosition = new Vector3(0f, topY + 0.3f, ShelfDepth / 2f);
 
-            var textMesh = go.AddComponent<TextMesh>();
-            textMesh.text = letter;
-            textMesh.characterSize = 0.3f;
-            textMesh.fontSize = 48;
-            textMesh.anchor = TextAnchor.MiddleCenter;
-            textMesh.alignment = TextAlignment.Center;
-            textMesh.color = Color.white;
+            var text = go.AddComponent<TMPro.TextMeshPro>();
+            text.text = letter;
+            text.color = Color.white;
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+            text.fontSize = 24;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 4f;
+            text.fontSizeMax = 72f;
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(1f, 0.5f);
         }
 
         // ---------- Докстанция + курьер ----------
@@ -411,6 +443,37 @@ namespace Gazon.EditorTools
 
             SetPrivateField(spawner, "customerPrefab", customerPrefab.GetComponent<Customer>());
             SetPrivateField(spawner, "entryPoint", entry.transform);
+        }
+
+        // ---------- Уличный декор за входом (KayKit City Builder Bits) ----------
+
+        /// <summary>Немного уличного декора снаружи проёма для клиентов — видно через дверной
+        /// проём, ощущение "снаружи есть город", а не голая пустота. Требует glTFast — без
+        /// него пропы молча пропускаются (см. LoadModel), сборка не ломается.</summary>
+        private static void BuildStreetDressing()
+        {
+            var root = new GameObject("StreetDressing");
+            float doorZ = (RoomLayout.EntranceZ0 + RoomLayout.EntranceZ1) / 2f;
+            float outsideX = RoomLayout.RoomWidth + 1.5f;
+
+            PlaceStreetProp(root.transform, $"{KayKitCityFolder}/road_straight.gltf",
+                new Vector3(RoomLayout.RoomWidth + 2.5f, 0f, doorZ), new Vector3(4f, 0.1f, 4f));
+            PlaceStreetProp(root.transform, $"{KayKitCityFolder}/streetlight.gltf",
+                new Vector3(outsideX, 0f, RoomLayout.EntranceZ0 - 1f), new Vector3(0.4f, 3f, 0.4f));
+            PlaceStreetProp(root.transform, $"{KayKitCityFolder}/bench.gltf",
+                new Vector3(outsideX, 0f, doorZ), new Vector3(1.4f, 0.8f, 0.6f));
+            PlaceStreetProp(root.transform, $"{KayKitCityFolder}/trash_A.gltf",
+                new Vector3(outsideX - 0.6f, 0f, RoomLayout.EntranceZ1 + 0.8f), new Vector3(0.5f, 0.7f, 0.5f));
+        }
+
+        private static void PlaceStreetProp(Transform parent, string modelPath, Vector3 groundPosition, Vector3 targetSize)
+        {
+            var visual = InstantiateModel(modelPath, parent);
+            if (visual == null) return;
+
+            visual.transform.position += new Vector3(groundPosition.x, 0f, groundPosition.z);
+            FitToSizeStretch(visual, targetSize);
+            GroundAt(visual, groundPosition.y);
         }
 
         // ---------- Префабы ----------
