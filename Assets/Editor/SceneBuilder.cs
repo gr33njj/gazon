@@ -83,13 +83,19 @@ namespace Gazon.EditorTools
         private static GameObject BuildPlayer()
         {
             var player = new GameObject("Player");
-            // Y=0 (пол) — CharacterController по умолчанию center=(0,1,0)/height=2, значит его
-            // нижняя точка окажется ровно на полу. Раньше здесь стоял y=1, из-за чего игрок
-            // висел на метр над полом, а камера (y=1.6 локально) оказывалась на 2.6 — отсюда
-            // и ощущение "я какой-то высокий" в новой полноразмерной комнате.
+            // Y=0 (пол) — низ CharacterController (см. явный center ниже) ровно на полу.
+            // Раньше здесь стоял y=1 при неявном (предполагаемом) center CharacterController,
+            // из-за чего игрок висел над полом, а камера оказывалась выше, чем задумано.
             player.transform.position = new Vector3(13f, 0f, 11.5f); // MVP: P.x=13,z=11.5
 
-            player.AddComponent<CharacterController>();
+            // Явно задаём center/height, а не полагаемся на дефолты CharacterController —
+            // раньше эта логика опиралась на предположение "center=(0,1,0) по умолчанию",
+            // которое не проверялось вживую в Editor. Так центр гарантированно совпадает
+            // с половиной высоты — низ капсулы точно на полу (root.y=0), без гаданий.
+            var cc = player.AddComponent<CharacterController>();
+            cc.height = 1.8f;
+            cc.radius = 0.35f;
+            cc.center = new Vector3(0f, cc.height / 2f, 0f);
             var interaction = player.AddComponent<PlayerInteraction>();
             var controller = player.AddComponent<PlayerController>();
             player.AddComponent<PlayerBuffs>();
@@ -601,6 +607,9 @@ namespace Gazon.EditorTools
         private static void FitToSizeStretch(GameObject instance, Vector3 targetSize)
         {
             var size = MeasureBoundsSize(instance, out _);
+            // Диагностика для CI-лога: без Editor'а под рукой это единственный способ увидеть
+            // реальные измеренные размеры моделей вместо гадания про масштаб (см. Docs/Decisions.md).
+            Debug.Log($"[FitToSizeStretch] {instance.name}: измерено={size}, цель={targetSize}");
             var scale = instance.transform.localScale;
             instance.transform.localScale = new Vector3(
                 size.x > 0.0001f ? scale.x * targetSize.x / size.x : scale.x,
@@ -613,6 +622,7 @@ namespace Gazon.EditorTools
         private static void FitToHeight(GameObject instance, float targetHeight)
         {
             var size = MeasureBoundsSize(instance, out _);
+            Debug.Log($"[FitToHeight] {instance.name}: измеренная высота={size.y}, цель={targetHeight}");
             if (size.y <= 0.0001f) return;
             instance.transform.localScale *= targetHeight / size.y;
         }

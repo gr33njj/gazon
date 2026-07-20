@@ -56,3 +56,6 @@ unity_build_log.txt
 unity_build.log
 ci_manual_test.log
 webgl-upload.zip
+
+# Случайно закоммиченный вывод локальной WebGL-сборки (см. Docs/Decisions.md, 2026-07-20)
+/Data/
