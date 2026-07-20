@@ -267,10 +267,30 @@ namespace Gazon.EditorTools
         {
             // TextMesh (legacy) использует "GUI/Text Shader" — Built-in-only, под URP не
             // рендерится (отсюда "не подписанные ячейки"/невидимая табличка). TextMeshPro
-            // рендерится корректно в обоих пайплайнах.
-            var go = new GameObject($"Sign_{letter}");
+            // рендерится корректно в обоих пайплайнах — НО только если в проекте хоть раз
+            // импортировали TMP Essential Resources (Window → TextMeshPro → Import TMP
+            // Essential Resources). Без этого TMP_Settings.defaultFontAsset == null, новый
+            // TextMeshPro остаётся без шрифта и не рисует ни одного глифа.
+            if (TMPro.TMP_Settings.defaultFontAsset == null)
+            {
+                Debug.LogError("TMP_Settings.defaultFontAsset == null — таблички стеллажей не будут " +
+                    "видны. Открой Window → TextMeshPro → Import TMP Essential Resources один раз в " +
+                    "этом проекте и запусти сборку сцены заново.");
+            }
+
+            // WarehouseShelving.obj после FitToSizeStretch не даёт гарантии, какая сторона по Z —
+            // видимый "перёд" (raw-модель симметрична по Z: -1.06..1.06, перёд неотличим по
+            // bounding box). Вешаем табличку на обе стороны, чтобы не зависеть от этого.
+            BuildShelfSignFace(parent, letter, topY, ShelfDepth / 2f + 0.03f, flipped: false);
+            BuildShelfSignFace(parent, letter, topY, -(ShelfDepth / 2f + 0.03f), flipped: true);
+        }
+
+        private static void BuildShelfSignFace(Transform parent, string letter, float topY, float localZ, bool flipped)
+        {
+            var go = new GameObject($"Sign_{letter}{(flipped ? "_Back" : "_Front")}");
             go.transform.SetParent(parent);
-            go.transform.localPosition = new Vector3(0f, topY + 0.3f, ShelfDepth / 2f);
+            go.transform.localPosition = new Vector3(0f, topY + 0.3f, localZ);
+            go.transform.localRotation = flipped ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
 
             var text = go.AddComponent<TMPro.TextMeshPro>();
             text.text = letter;
@@ -278,7 +298,9 @@ namespace Gazon.EditorTools
             text.alignment = TMPro.TextAlignmentOptions.Center;
             text.fontSize = 24;
             text.enableAutoSizing = true;
-            text.fontSizeMin = 4f;
+            // fontSizeMin был 4 — если auto-sizing когда-нибудь упрётся в этот пол, буква станет
+            // микроскопической. Не даём ему опускаться ниже базового fontSize.
+            text.fontSizeMin = 24f;
             text.fontSizeMax = 72f;
             var rect = go.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(1f, 0.5f);
