@@ -2,8 +2,9 @@ namespace Gazon.Customers
 {
     public enum CustomerState
     {
-        Entering,
+        Queue,
         AtWindow,
+        Fitting,
         Leaving
     }
 }

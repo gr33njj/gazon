@@ -65,7 +65,10 @@ namespace Gazon.World
             box.PlaceOnShelf(this);
             player.DropCarriedBox();
 
-            GameManager.Instance.AddMoney(10f);
+            GameManager.Instance.Earn(10f);
+            // MVP: помятая (fragile+dented) коробка при укладке — штраф 20₽ "спасибо курьеру".
+            if (box.IsDented)
+                GameManager.Instance.Fine(20f, "Помятая коробка (спасибо курьеру)");
         }
     }
 }

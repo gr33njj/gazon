@@ -7,8 +7,12 @@ using UnityEngine;
 
 namespace Gazon.World
 {
-    /// <summary>Окно выдачи (в MVP их 2). Игрок приносит сюда коробку клиента, который у окна ждёт.</summary>
-    [RequireComponent(typeof(BoxCollider))] // нужен коллайдер, чтобы Physics.Raycast из PlayerInteraction её видел
+    /// <summary>
+    /// Окно выдачи (в MVP их 2). Без коробки в руках — можно поиграть в крокодила/пробить в
+    /// «Глазе Бога». С коробкой заказа — либо сначала «Глаз Бога» (если код не восстановлен),
+    /// либо попытка выдачи (30% шанс QTE, см. MinigameController).
+    /// </summary>
+    [RequireComponent(typeof(BoxCollider))]
     public class WindowStation : MonoBehaviour, IInteractable
     {
         private static readonly List<WindowStation> AllWindows = new List<WindowStation>();
@@ -42,21 +46,74 @@ namespace Gazon.World
 
         public string GetPrompt(PlayerInteraction player)
         {
+            if (CurrentCustomer == null) return string.Empty;
             var box = player.CarriedBox;
-            if (box == null || CurrentCustomer == null) return string.Empty;
-            if (CurrentCustomer.OrderBox != box) return "Это не его заказ";
+
+            if (box == null)
+            {
+                if (CurrentCustomer.Archetype == CustomerArchetype.Babka && !CurrentCustomer.Guessed)
+                    return "Играть в «крокодила» с бабушкой";
+                if (CurrentCustomer.NeedsCode && !CurrentCustomer.CodeFixed)
+                    return "Пробить в «Глазе Бога»";
+                return string.Empty;
+            }
+
+            if (CurrentCustomer.OrderBox != box) return string.Empty;
+
+            if (CurrentCustomer.NeedsCode && !CurrentCustomer.CodeFixed)
+                return "Пробить в «Глазе Бога»";
+
             return "Выдать заказ";
         }
 
         public void Interact(PlayerInteraction player)
         {
+            if (CurrentCustomer == null) return;
             var box = player.CarriedBox;
-            if (box == null || CurrentCustomer == null || CurrentCustomer.OrderBox != box) return;
 
+            if (box == null)
+            {
+                if (CurrentCustomer.Archetype == CustomerArchetype.Babka && !CurrentCustomer.Guessed)
+                {
+                    MinigameController.Instance.StartBabka(CurrentCustomer);
+                    return;
+                }
+                if (CurrentCustomer.NeedsCode && !CurrentCustomer.CodeFixed)
+                {
+                    MinigameController.Instance.StartEye(CurrentCustomer);
+                    return;
+                }
+                return;
+            }
+
+            if (CurrentCustomer.OrderBox != box) return;
+
+            if (CurrentCustomer.NeedsCode && !CurrentCustomer.CodeFixed)
+            {
+                MinigameController.Instance.StartEye(CurrentCustomer);
+                return;
+            }
+
+            // MVP: attemptHandOver — 30% шанс QTE перед выдачей.
+            if (Random.value < 0.3f)
+                MinigameController.Instance.StartQte(this, CurrentCustomer, box);
+            else
+                CompleteHandOver(box);
+        }
+
+        /// <summary>
+        /// Вызывается напрямую (мгновенная выдача) либо из MinigameController после QTE
+        /// (штраф за помятость при провале QTE уже применён вызывающей стороной).
+        /// </summary>
+        public void CompleteHandOver(Box box)
+        {
+            var customer = CurrentCustomer;
             box.HandOver();
-            player.DropCarriedBox(destroyBox: true);
-            GameManager.Instance.AddMoney(45f);
-            CurrentCustomer.CompleteOrderAndLeave();
+            PlayerInteraction.Instance.DropCarriedBox(destroyBox: true);
+            GameManager.Instance.Earn(45f);
+            GameManager.Instance.RecordServed();
+            GameManager.Instance.Toast("✅ Выдано! +45 ₽");
+            customer?.CompleteOrderAndLeave();
         }
     }
 }

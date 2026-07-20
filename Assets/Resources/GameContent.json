@@ -1,0 +1,326 @@
+{
+  "customerArchetypes": [
+    {
+      "name": "normal",
+      "spawnWeight": 0.81,
+      "basePatience": 34.0
+    },
+    {
+      "name": "babka",
+      "spawnWeight": 0.1,
+      "basePatience": 44.0
+    },
+    {
+      "name": "shopaholic",
+      "spawnWeight": 0.09,
+      "basePatience": 34.0
+    }
+  ],
+  "dialogueLines": [
+    {
+      "category": "spawn",
+      "archetype": "normal",
+      "text": "Мне бы заказик забрать"
+    },
+    {
+      "category": "spawn",
+      "archetype": "normal",
+      "text": "Код: 4-8-15-16-23-42"
+    },
+    {
+      "category": "spawn",
+      "archetype": "normal",
+      "text": "Я быстро, такси ждёт"
+    },
+    {
+      "category": "spawn",
+      "archetype": "normal",
+      "text": "Тут моя посылочка!"
+    },
+    {
+      "category": "spawn",
+      "archetype": "normal",
+      "text": "Только не говорите, что потеряли"
+    },
+    {
+      "category": "nocode",
+      "archetype": "normal",
+      "text": "У меня код не пришёл!!"
+    },
+    {
+      "category": "nocode",
+      "archetype": "normal",
+      "text": "Телефон сел, выдайте так"
+    },
+    {
+      "category": "nocode",
+      "archetype": "normal",
+      "text": "Какой ещё код?!"
+    },
+    {
+      "category": "angry",
+      "archetype": "",
+      "text": "Я буду жаловаться!"
+    },
+    {
+      "category": "angry",
+      "archetype": "",
+      "text": "Одна звезда!"
+    },
+    {
+      "category": "angry",
+      "archetype": "",
+      "text": "Ноги моей тут не будет. До завтра."
+    },
+    {
+      "category": "angry",
+      "archetype": "",
+      "text": "Безобразие!!"
+    },
+    {
+      "category": "fitting",
+      "archetype": "",
+      "text": "Я только гляну…"
+    },
+    {
+      "category": "fitting",
+      "archetype": "",
+      "text": "Это не мой размер!"
+    },
+    {
+      "category": "fitting",
+      "archetype": "",
+      "text": "На фото было другое 😤"
+    },
+    {
+      "category": "happy",
+      "archetype": "",
+      "text": "Спасибо!"
+    },
+    {
+      "category": "happy",
+      "archetype": "",
+      "text": "Наконец-то!"
+    },
+    {
+      "category": "happy",
+      "archetype": "",
+      "text": "Донесу не открывая. Шучу."
+    },
+    {
+      "category": "babka_spawn",
+      "archetype": "babka",
+      "text": "Внученька, я заказала… что-то…"
+    }
+  ],
+  "shopUpgrades": [
+    {
+      "key": "mat",
+      "name": "Отвечать клиентам матом",
+      "description": "Злой клиент? 50/50: уважение улицы или жалоба на лексику.",
+      "price": 500
+    },
+    {
+      "key": "mic",
+      "name": "Микрофон для репа",
+      "description": "Записывай фристайл прямо на стойке. +5% к флоу (скорости). Иногда клиенты снимают сторис (+20₽).",
+      "price": 1500
+    },
+    {
+      "key": "troika",
+      "name": "Карта «Тройка»",
+      "description": "На работу не пешком: каждый день +20 секунд к смене.",
+      "price": 800
+    }
+  ],
+  "fines": [
+    {
+      "reason": "Клиент пожаловался, что вы дышали",
+      "amount": 30,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Помятая коробка на фотоотчёте",
+      "amount": 20,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Слишком долго смотрели в окно",
+      "amount": 10,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Улыбка не соответствует брендбуку",
+      "amount": 25,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Скотч отклеен под неправильным углом",
+      "amount": 15,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Найден перекур на камере №4",
+      "amount": 35,
+      "isAbsurd": true
+    },
+    {
+      "reason": "Помятая коробка (спасибо курьеру)",
+      "amount": 20,
+      "isAbsurd": false
+    },
+    {
+      "reason": "Помятая коробка при выдаче",
+      "amount": 30,
+      "isAbsurd": false
+    },
+    {
+      "reason": "У курьера кенты в Яндекс.Доставке. Стрелка не задалась",
+      "amount": 150,
+      "isAbsurd": false
+    },
+    {
+      "reason": "Спалили на перекуре. Жалоба в поддержку",
+      "amount": 60,
+      "isAbsurd": false
+    },
+    {
+      "reason": "Залипание в телефон при клиентах",
+      "amount": 25,
+      "isAbsurd": false
+    },
+    {
+      "reason": "Недостача не найдена. Вычли из ЗП",
+      "amount": 100,
+      "isAbsurd": false
+    },
+    {
+      "reason": "Жалоба на лексику сотрудника",
+      "amount": 40,
+      "isAbsurd": false
+    }
+  ],
+  "memes": [
+    {
+      "emoji": "🐈",
+      "text": "Кот увидел цену доставки"
+    },
+    {
+      "emoji": "📦",
+      "text": "Когда заказал XS, а пришло ХЗ"
+    },
+    {
+      "emoji": "🧍",
+      "text": "Очередь в ПВЗ 31 декабря в 20:59"
+    },
+    {
+      "emoji": "🤳",
+      "text": "«Я на минутку» — минутка (48 коробок)"
+    },
+    {
+      "emoji": "🚚",
+      "text": "Курьер и надпись «хрупкое»: история вражды"
+    },
+    {
+      "emoji": "💸",
+      "text": "Зарплата пришла → зарплата ушла на возвраты"
+    },
+    {
+      "emoji": "🧾",
+      "text": "Штраф за то, что штрафов мало"
+    },
+    {
+      "emoji": "🐕",
+      "text": "Пёс охраняет ячейку Б4 лучше тебя"
+    },
+    {
+      "emoji": "😴",
+      "text": "Ночная смена. Товар не сходится. Опять."
+    },
+    {
+      "emoji": "🧤",
+      "text": "Примерил перчатки. Вернул перчатки. Купил перчатки."
+    },
+    {
+      "emoji": "📵",
+      "text": "«Код не пришёл» — гимн ПВЗ"
+    },
+    {
+      "emoji": "🥤",
+      "text": "Энергетик на перекуре — это ЗОЖ, если быстро"
+    },
+    {
+      "emoji": "🎤",
+      "text": "Записал реп на стойке. Клиент поставил 1 звезду. Хейтеры."
+    },
+    {
+      "emoji": "🧓",
+      "text": "Бабушка заказала «что-то». Крокодил начался."
+    },
+    {
+      "emoji": "🟣",
+      "text": "Фиолетовый ПВЗ через дорогу опять переманивает"
+    },
+    {
+      "emoji": "📱",
+      "text": "Чехол на Poco X7 Pro Max 48px — валюта улиц"
+    }
+  ],
+  "babkaItems": [
+    {
+      "name": "Носки, 47 пар",
+      "hint": "что-то тёплое… много… мужу…"
+    },
+    {
+      "name": "Эпилятор",
+      "hint": "жужжит и делает больно…"
+    },
+    {
+      "name": "Чехол Poco X7 Pro Max 48px",
+      "hint": "на телефон… как у внука…"
+    },
+    {
+      "name": "Садовый гном",
+      "hint": "маленький мужичок… для дачи…"
+    },
+    {
+      "name": "Термос",
+      "hint": "чтоб чай не остывал в поликлинике…"
+    },
+    {
+      "name": "Пряжа, 3 мотка",
+      "hint": "нитки… свитер коту вязать…"
+    },
+    {
+      "name": "Тонометр",
+      "hint": "давление мерить… ну вы поняли…"
+    }
+  ],
+  "ranks": [
+    {
+      "title": "🥉 Стажёр склада",
+      "minDayEarned": 0,
+      "isPurpleVariant": false
+    },
+    {
+      "title": "🥈 Кладовщик 3 разряда",
+      "minDayEarned": 250,
+      "isPurpleVariant": false
+    },
+    {
+      "title": "🥇 Мастер выдачи",
+      "minDayEarned": 600,
+      "isPurpleVariant": false
+    },
+    {
+      "title": "👑 Легенда синей империи",
+      "minDayEarned": 1100,
+      "isPurpleVariant": false
+    },
+    {
+      "title": "👑 Легенда фиолетовой империи",
+      "minDayEarned": 1100,
+      "isPurpleVariant": true
+    }
+  ]
+}
